@@ -1,6 +1,6 @@
 # 口袋收藏 · GitHub Pages 版
 
-收集 IG／Facebook 連結、美食介紹、景點、圖片與影片，整理成可搜尋的私人收藏。這是 **React + Vite 的純靜態專案**，不依賴 Sites、Cloudflare、伺服器或登入服務。
+收集 IG／Facebook 連結、美食介紹、景點、圖片與影片，整理成可搜尋的私人收藏。這是 **React + Vite 靜態前端**。可選擇連接自己的 Supabase Edge Function 讀取公開 IG 貼文介紹，不需 Cloudflare 或登入服務。
 
 ## 部署到 GitHub Pages
 
@@ -42,6 +42,7 @@ npm run preview
 - 在新增視窗貼上剪貼簿截圖。
 - 在裝置上辨識繁體中文／英文圖片文字；影片取樣 4 個畫面做文字辨識。
 - 從文字依規則擷取分類、地區、地址、明確標示的均消與關鍵字。結果需人工確認。
+- 設定自己的 Supabase 函式後，可讀取公開 IG 貼文介紹，將多家店分開勾選、修改與收藏。
 - 搜尋、分類、地區和來源篩選、想去／去過／最愛、編輯與合併收藏。
 - 原始連結防重複、保留多個推薦來源、Google Maps 搜尋連結。
 - IndexedDB 儲存紀錄和原始附件。
@@ -53,7 +54,7 @@ npm run preview
 
 **資料存在各裝置、各瀏覽器，不會自動跨裝置同步。** 使用完整備份匯出／匯入搬移資料。清除網站資料、無痕模式結束或裝置空間不足可能使資料消失；請定期備份。換網址、換儲存庫路徑前也請先備份。
 
-純 GitHub Pages 沒有伺服器代理，本版**不自動抓取 IG／FB 連結內的影片或貼文**。連結可以保存；要整理內容，請補貼文文字、截圖，或上傳可取得的影片檔。不會自動讀取你在 IG／FB 帳號內的既有收藏。
+未設定 IG 連線時，連結只保存來源。連接自己的 Supabase 函式後，可讀取公開 IG 貼文介紹；IG 可能要求登入或限制存取，此時保留連結並顯示失敗原因，可手動補文字或截圖。本版不下載 IG／FB 影片，也不會自動讀取你在平台內的既有收藏。
 
 本版沒有影片語音轉錄或大型語言模型。OCR 是讀文字，不是完整理解影片；影片取樣可能漏掉字幕。HEIC 和部分 MOV 的辨識取決於瀏覽器解碼支援，失敗時改用 JPG 或 MP4。
 
@@ -66,6 +67,9 @@ GitHub Pages 網址的程式本身可以公開查看，但本版不把你的收�
 ## 檔案結構
 
 - `src/Inbox.tsx`：操作介面。
+- `src/ConnectionSettings.tsx`、`src/lib/remote.ts`：IG 連線設定與請求。
+- `src/PlaceCandidates.tsx`：多家店確認清單。
+- `supabase/functions/ig-collect/index.ts`：已驗證中文標題格式的後端原始碼；需另外部署到 Supabase。
 - `src/lib/local-store.ts`：IndexedDB 與完整備份。
 - `src/lib/organize.ts`：文字擷取與資料正規化。
 - `src/lib/ocr.ts`：圖片／影片畫面文字辨識。
@@ -74,3 +78,13 @@ GitHub Pages 網址的程式本身可以公開查看，但本版不把你的收�
 - `ready-to-upload/`：本次已建置網站；日後用 `npm run build` 取得新的 `dist/`。
 
 第三方 OCR 授權與來源見 `public/ocr/THIRD_PARTY_NOTICES.md`。
+
+## 連接 Supabase
+
+1. 使用 Supabase 網頁編輯器部署 `supabase/functions/ig-collect/index.ts`，函式名 `ig-collect`。
+2. 在 Edge Functions → Secrets 設定 `POCKET_ACCESS_TOKEN`（至少 24 字元的隨機密碼），以及 `ALLOWED_ORIGINS`（網站 origin，例如 `https://888god888.github.io`；不包含 `/pocketplace/`）。本機開發可另加 `http://127.0.0.1:5173`，多個來源以逗號分隔。
+3. 僅為 `ig-collect` 關閉內建 JWT 驗證，函式自行檢查 `x-pocket-token`。程式碼與 GitHub 不包含真實密碼。
+4. 在網站左側「IG 連線設定」貼上 Function URL 與密碼，按「儲存並測試」。服務網址保存在此瀏覽器，密碼保存在分頁工作階段，不進入收藏備份。
+5. 新增 IG 連結後按「讀取連結並自動整理」，多家店可逐一勾選、修正，最後一次收藏。
+
+同一批收藏共用來源與附件；保留批次識別，讓多店清單在備份與匯入時不會被誤判為同一張卡片。單筆既有收藏的來源防重複規則保持適用。IG 介紹未提供的地址與價格留白，語音與雲端同步尚未提供。

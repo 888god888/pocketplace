@@ -1,8 +1,14 @@
 export type Attachment={id:string;name:string;type:string;size:number};
-export type Collection={id:string;title:string;category:string;city:string;address:string;price:string;tags:string[];notes:string;content:string;sources:string[];files:Attachment[];visited:boolean;favorite:boolean;reviewed:boolean;createdAt:number;updatedAt:number};
+export type Collection={id:string;title:string;category:string;city:string;address:string;price:string;tags:string[];notes:string;content:string;sources:string[];files:Attachment[];visited:boolean;favorite:boolean;reviewed:boolean;createdAt:number;updatedAt:number;groupId?:string};
 export const categories=['美食','咖啡甜點','景點','住宿','其他'];
 export function safeUrl(raw:string){try{const u=new URL(raw.trim());if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return '';return u.href}catch{return ''}}
 export function canonical(raw:string){try{const u=new URL(raw);for(const key of [...u.searchParams.keys()])if(/^(utm_|fbclid|igsh|igshid|mibextid)/i.test(key))u.searchParams.delete(key);u.hash='';return u.href.replace(/\/$/,'')}catch{return raw}}
+export function sameSourceCollection(a:{sources:string[];title:string;groupId?:string},b:{sources:string[];title:string;groupId?:string}) {
+ if(!a.sources.some(s=>b.sources.some(t=>canonical(s)===canonical(t))))return false;
+ if(!a.groupId||!b.groupId)return true;
+ const title=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/[’‘]/g,"'").replace(/\s/g,'');
+ return title(a.title)===title(b.title);
+}
 export function sourceName(url:string){try{const h=new URL(url).hostname;if(/(^|\.)instagram\.com$/.test(h))return 'Instagram';if(/(^|\.)(facebook\.com|fb\.watch)$/.test(h))return 'Facebook';if(/(^|\.)(youtube\.com|youtu\.be)$/.test(h))return 'YouTube';return '網頁'}catch{return '文字／檔案'}}
 export function extract(text:string){
  const t=text.replace(/\r/g,'');const compact=t.replace(/([\u3400-\u9fff])[ \t]+(?=[\u3400-\u9fff])/g,'$1');
@@ -14,4 +20,4 @@ export function extract(text:string){
  const title=compact.match(/(?:店名|餐廳名稱|景點名稱|名稱)\s*[:：]\s*([^\n#]{2,50})/)?.[1]?.trim()||'';
  return {title,category,city,address:addr,price,tags};
 }
-export function cleanItem(raw:any){return {title:String(raw.title||'未命名收藏').slice(0,120),category:categories.includes(raw.category)?raw.category:'其他',city:String(raw.city||'').slice(0,30),address:String(raw.address||'').slice(0,200),price:String(raw.price||'').slice(0,80),tags:Array.isArray(raw.tags)?[...new Set(raw.tags.map(String))].slice(0,20).map(x=>String(x).slice(0,30)):[],notes:String(raw.notes||'').slice(0,10000),content:String(raw.content||'').slice(0,60000),sources:Array.isArray(raw.sources)?[...new Set<string>(raw.sources.map(String).map(safeUrl).filter(Boolean))].slice(0,30):[],files:Array.isArray(raw.files)?raw.files.slice(0,8).filter((x:any)=>typeof x?.id==='string').map((x:any)=>({id:x.id,name:String(x.name).slice(0,150),type:String(x.type).slice(0,100),size:Number(x.size)||0})):[],visited:!!raw.visited,favorite:!!raw.favorite,reviewed:!!raw.reviewed};}
+export function cleanItem(raw:any){return {...(typeof raw.groupId==='string'&&raw.groupId?{groupId:raw.groupId.slice(0,80)}:{}),title:String(raw.title||'未命名收藏').slice(0,120),category:categories.includes(raw.category)?raw.category:'其他',city:String(raw.city||'').slice(0,30),address:String(raw.address||'').slice(0,200),price:String(raw.price||'').slice(0,80),tags:Array.isArray(raw.tags)?[...new Set(raw.tags.map(String))].slice(0,20).map(x=>String(x).slice(0,30)):[],notes:String(raw.notes||'').slice(0,10000),content:String(raw.content||'').slice(0,60000),sources:Array.isArray(raw.sources)?[...new Set<string>(raw.sources.map(String).map(safeUrl).filter(Boolean))].slice(0,30):[],files:Array.isArray(raw.files)?raw.files.slice(0,8).filter((x:any)=>typeof x?.id==='string').map((x:any)=>({id:x.id,name:String(x.name).slice(0,150),type:String(x.type).slice(0,100),size:Number(x.size)||0})):[],visited:!!raw.visited,favorite:!!raw.favorite,reviewed:!!raw.reviewed};}
