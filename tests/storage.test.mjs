@@ -1,0 +1,27 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import 'fake-indexeddb/auto';
+import ts from 'typescript';
+import {readFile} from 'node:fs/promises';
+globalThis.document={baseURI:'https://example.github.io/pocket-places/'};
+Object.defineProperty(globalThis,'navigator',{value:{storage:{persist:async()=>true}},configurable:true});
+globalThis.FileReader=class{readAsDataURL(blob){blob.arrayBuffer().then(b=>{this.result='data:'+blob.type+';base64,'+Buffer.from(b).toString('base64');this.onload?.()}).catch(()=>this.onerror?.())}};
+const source=await readFile(new URL('../src/lib/local-store.ts',import.meta.url),'utf8');
+const compiled=ts.transpileModule(source.replace("'./organize'",JSON.stringify(new URL('../src/lib/organize.ts',import.meta.url).href)),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+const {api,exportBackup,importBackup}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+test('收藏儲存、防重複、附件備份還原與刪除',async()=>{
+ assert.deepEqual(await api('/api/items'),[]);
+ const form=new FormData();form.set('file',new File([new Uint8Array([1,2,3,4])],'photo.png',{type:'image/png'}));
+ const attachment=await api('/api/files',{method:'POST',body:form});
+ const item=await api('/api/items',{method:'POST',body:JSON.stringify({title:'小巷咖啡',category:'咖啡甜點',sources:['https://www.instagram.com/reel/test/?igsh=123'],files:[attachment]})});
+ assert.equal((await api('/api/items'))[0].title,'小巷咖啡');
+ await assert.rejects(api('/api/items',{method:'POST',body:JSON.stringify({title:'重複',sources:['https://www.instagram.com/reel/test/']})}),/已經收藏/);
+ const backup=await exportBackup();const parsed=JSON.parse(await backup.text());assert.equal(parsed.assets[0].base64,'AQIDBA==');
+ const backupFile=new File([backup],'backup.json',{type:'application/json'});
+ assert.equal((await importBackup(backupFile)).skipped,1);
+ await api('/api/items?id='+item.id,{method:'DELETE'});assert.deepEqual(await api('/api/items'),[]);
+ assert.equal((await importBackup(backupFile)).imported,1);const restored=(await api('/api/items'))[0];assert.equal(restored.title,'小巷咖啡');assert.notEqual(restored.files[0].id,attachment.id);
+ const again=JSON.parse(await (await exportBackup()).text());assert.equal(again.assets[0].base64,'AQIDBA==');
+ const bad=new File([JSON.stringify({...parsed,assets:[{...parsed.assets[0],type:'image/svg+xml'}]})],'bad.json');await assert.rejects(importBackup(bad),/格式不正確/);
+ assert.equal((await api('/api/items')).length,1);
+});
