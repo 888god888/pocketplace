@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import ts from 'typescript';
 import {readFile} from 'node:fs/promises';
+import {resolveCollectionTitle,extract} from '../src/lib/organize.ts';
 globalThis.document={baseURI:'https://example.github.io/pocket-places/'};
 Object.defineProperty(globalThis,'navigator',{value:{storage:{persist:async()=>true}},configurable:true});
 globalThis.FileReader=class{readAsDataURL(blob){blob.arrayBuffer().then(b=>{this.result='data:'+blob.type+';base64,'+Buffer.from(b).toString('base64');this.onload?.()}).catch(()=>this.onerror?.())}};
@@ -25,6 +26,16 @@ test('收藏儲存、防重複、附件備份還原與刪除',async()=>{
  const again=JSON.parse(await (await exportBackup()).text());assert.equal(again.assets[0].base64,'AQIDBA==');
  const bad=new File([JSON.stringify({...parsed,assets:[{...parsed.assets[0],type:'image/svg+xml'}]})],'bad.json');await assert.rejects(importBackup(bad),/格式不正確/);
  assert.equal((await api('/api/items')).length,1);
+});
+
+test('舊收藏的預設標題在分析後更新，並於重新讀取與備份時保留',async()=>{
+ const item=await api('/api/items',{method:'POST',body:JSON.stringify({title:'待確認店名的收藏',sources:['https://example.com/title-regression'],content:'店名：標題修正測試店\n地址：台北市中山區測試路1號'})});
+ const fields=extract(item.content);
+ await api('/api/items',{method:'PATCH',body:JSON.stringify({...item,title:resolveCollectionTitle(item.title,fields.title)})});
+ const saved=(await api('/api/items')).find(x=>x.id===item.id);
+ assert.equal(saved.title,'標題修正測試店');
+ const backup=JSON.parse(await (await exportBackup()).text());assert.equal(backup.items.find(x=>x.id===item.id).title,'標題修正測試店');
+ await api('/api/items?id='+item.id,{method:'DELETE'});
 });
 
 test('同則貼文的六家店原子儲存、重複阻擋及完整備份還原',async()=>{

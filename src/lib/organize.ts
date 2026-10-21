@@ -1,6 +1,11 @@
 export type Attachment={id:string;name:string;type:string;size:number};
 export type Collection={id:string;title:string;category:string;city:string;address:string;price:string;tags:string[];notes:string;content:string;sources:string[];files:Attachment[];visited:boolean;favorite:boolean;reviewed:boolean;createdAt:number;updatedAt:number;groupId?:string;mapsUrl?:string};
 export const categories=['美食','咖啡甜點','景點','住宿','其他'];
+const placeholderTitles=new Set(['','待確認店名的收藏','待整理的靈感','未命名收藏']);
+export function resolveCollectionTitle(current:string|undefined,detected:string|undefined) {
+ const title=(current||'').trim(),recognized=(detected||'').trim();
+ return placeholderTitles.has(title)&&!placeholderTitles.has(recognized)?recognized:title;
+}
 export function safeUrl(raw:string){try{const u=new URL(raw.trim());if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return '';return u.href}catch{return ''}}
 export function safeMapsUrl(raw:unknown) {
   if(typeof raw!=='string'||raw.trim().length>4096)return '';
