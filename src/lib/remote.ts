@@ -1,4 +1,4 @@
-import {categories, cleanItem, extract, safeUrl} from './organize';
+import {categories, cleanItem, extract, extractPlaces, safeUrl} from './organize';
 
 export type Connection = {url: string; token: string};
 export type Place = {title:string; category:string; city:string; address:string; price:string; tags:string[]; notes:string; mapsUrl?:string};
@@ -75,12 +75,22 @@ function placeFields(raw:unknown):Place {
 
 export async function analyzeInput(input:{url:string;content:string}, settings:Connection) {
   const source = safeUrl(input.url);
-  if (!isInstagramPost(source)) return {fields:extract(input.content),content:input.content,places:[] as Place[],message:source?'已整理提供的文字；此來源目前只保留連結。':'已從提供的文字擷取資訊，請確認結果。'};
-  if (!settings.url || !settings.token) throw Error('請先按「IG 連線設定」，填入 Function URL 與連線密碼，再重試。');
-  const data = await callFunction(settings,{url:source});
+  const local=(prefix='')=>{
+    const places:Place[]=extractPlaces(input.content);
+    return {fields:places[0]||extract(input.content),content:input.content,places,message:prefix+(places.length?`已整理出 ${places.length} 個地點並附上地圖搜尋，確認後即可收藏。`:'尚未可靠辨識到店名，可先保留原始內容，稍後再整理。')};
+  };
+  if (!isInstagramPost(source)) return local(source?'此來源先保留連結。':'');
+  if (!settings.url || !settings.token) {
+    if(input.content.trim())return local('尚未連接 IG，先使用提供的文字或截圖。');
+    throw Error('請先按「IG 連線設定」，填入 Function URL 與連線密碼，再重試。');
+  }
+  let data:any;
+  try{data=await callFunction(settings,{url:source})}
+  catch(e){if(input.content.trim())return local('IG 介紹暫時無法讀取，先使用提供的文字或截圖。');throw e}
   if (typeof data?.caption!=='string' || data.caption.trim().length<4 || !Array.isArray(data.places)) throw Error('回傳結果不完整，尚未完成整理。');
-  const places:Place[] = data.places.slice(0,20).map(placeFields).filter((p:Place)=>p.title.trim());
+  let places:Place[] = data.places.slice(0,20).map(placeFields).filter((p:Place)=>p.title.trim());
+  if(!places.length)places=extractPlaces(data.caption);
   const caption=data.caption.trim(),pasted=input.content.trim();
   const content = (pasted===caption||pasted.startsWith(caption+'\n\n')?pasted:[caption,pasted].filter(Boolean).join('\n\n')).slice(0,60000);
-  return {fields:places[0]||extract(data.caption),content,places,message:places.length?`已讀取 IG 介紹，辨識 ${places.length} 個地點。請確認後再收藏。`:'已讀到 IG 介紹，尚未辨識到店名，請補充確認。'};
+  return {fields:places[0]||extract(data.caption),content,places,message:places.length?`已讀取 IG 介紹，辨識 ${places.length} 個地點並附上地圖搜尋。確認後即可收藏。`:'已讀到 IG 介紹，尚未辨識到店名，請補充確認。'};
 }

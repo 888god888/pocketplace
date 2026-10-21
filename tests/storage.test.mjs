@@ -65,3 +65,12 @@ test('同則貼文的六家店原子儲存、重複阻擋及完整備份還原',
  const after=JSON.parse(await (await exportBackup()).text());assert.equal(after.assets.filter(x=>x.name==='shared.png').length,1);
  await assert.rejects(api('/api/items/batch',{method:'POST',body:JSON.stringify({items:[{title:'',sources:[url]}]})}),/名稱/);
 });
+test('純截圖多店沒有原始網址也能儲存，備份還原不遺漏或重複',async()=>{
+ const payload=['截圖咖啡甲','截圖食堂乙'].map(title=>({title,content:'純截圖的兩家店',sources:[],mapsUrl:'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(title+' 台北')}));
+ const saved=await api('/api/items/batch',{method:'POST',body:JSON.stringify({items:payload})});assert.equal(saved.length,2);
+ const backup=await exportBackup();
+ for(const item of saved)await api('/api/items?id='+item.id,{method:'DELETE'});
+ const first=await importBackup(new File([backup],'screenshot-batch.json'));assert.equal(first.imported,2);
+ const second=await importBackup(new File([backup],'screenshot-batch.json'));assert.equal(second.imported,0);
+ const restored=(await api('/api/items')).filter(item=>item.groupId===saved[0].groupId);assert.equal(restored.length,2);assert.ok(restored.every(item=>item.mapsUrl.includes('/maps/search/')));
+});

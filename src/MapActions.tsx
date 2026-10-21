@@ -1,11 +1,11 @@
 import {useId,useState} from 'react';
 import {MapPin,Copy,ArrowUpRight} from 'lucide-react';
-import {copyMapsText,mapsSearchQuery,mapsSearchUrl,safeMapsUrl,type MappablePlace} from './lib/maps';
+import {copyMapsText,mapsSearchQuery,mapsSearchUrl,safeMapsUrl,isMapsSearchUrl,type MappablePlace} from './lib/maps';
 
 export default function MapActions({place,disabled=false}:{place:MappablePlace;disabled?:boolean}) {
   const [feedback,setFeedback]=useState(''),[manual,setManual]=useState('');
   const id=useId();
-  const search=mapsSearchUrl(place),saved=safeMapsUrl(place.mapsUrl);
+  const search=mapsSearchUrl(place),saved=isMapsSearchUrl(place.mapsUrl)?'':safeMapsUrl(place.mapsUrl);
   const name=[place.title?.trim(),place.city?.trim()].filter(Boolean).join(' ');
   async function copy(text:string,label:string) {
     setManual('');
@@ -27,9 +27,9 @@ export default function MapActions({place,disabled=false}:{place:MappablePlace;d
 export function MapLinkField({id,value,onChange,disabled=false}:{id:string;value:string;onChange:(value:string)=>void;disabled?:boolean}) {
   const [touched,setTouched]=useState(false);
   const invalid=touched&&!!value.trim()&&!safeMapsUrl(value);
-  return <div className="map-link-field">
+  return <details className="map-link-field"><summary>指定地圖分店（選填）</summary>
     <label className="field-label" htmlFor={id}>Google 地圖分享連結 <span>選填</span></label>
     <input id={id} type="url" value={value} disabled={disabled} onChange={e=>onChange(e.target.value)} onBlur={()=>setTouched(true)} placeholder="貼上 Google 地圖 → 分享 → 複製連結" autoComplete="off" spellCheck={false} aria-invalid={invalid} aria-describedby={id+'-hint'}/>
-    <p id={id+'-hint'} className={invalid?'map-field-error':'microcopy'}>{invalid?'請貼上完整的 Google 地圖 https 分享連結。':'連結會與這張卡片一起保存；店名、地址仍可自行補充。'}</p>
-  </div>;
+    <p id={id+'-hint'} className={invalid?'map-field-error':'microcopy'}>{invalid?'請貼上完整的 Google 地圖 https 分享連結。':'已自動附上地圖搜尋，不必另填。想固定某個分店時，才需貼上該店分享連結。'}</p>
+  </details>;
 }

@@ -6,7 +6,7 @@ import {safeMapsUrl,sourceName,cleanItem} from '../src/lib/organize.ts';
 
 const source=await readFile(new URL('../src/lib/maps.ts',import.meta.url),'utf8');
 const compiled=ts.transpileModule(source.replace("'./organize'",JSON.stringify(new URL('../src/lib/organize.ts',import.meta.url).href)),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
-const {mapsSearchQuery,mapsSearchUrl,copyMapsText}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+const {mapsSearchQuery,mapsSearchUrl,automaticMapsUrl,isMapsSearchUrl,copyMapsText}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
 
 test('地圖搜尋包含店名與地址，沒有地址時使用地區，並正確編碼',()=>{
  const place={title:'ED’s Diner & 咖啡',city:'台北',address:'臺北市中山區樂群二路216號'};
@@ -30,4 +30,12 @@ test('複製送出指定文字，權限拒絕與空文字回傳手動複製狀�
  assert.equal(await copyMapsText('兄弟麵館 台北',{writeText:async text=>{copied=text}}),true);assert.equal(copied,'兄弟麵館 台北');
  assert.equal(await copyMapsText('臺北市中山區樂群二路216號',{writeText:async()=>{throw Error('permission denied')}}),false);
  assert.equal(await copyMapsText('',{writeText:async()=>{throw Error('must not be called')}}),false);
+});
+test('自動地圖不需手動貼連結，改店名會更新搜尋但保留指定分店',()=>{
+ const generated=automaticMapsUrl({title:'小巷咖啡',city:'桃園'});
+ assert.equal(isMapsSearchUrl(generated),true);assert.equal(new URL(generated).searchParams.get('query'),'小巷咖啡 桃園');
+ const changed=automaticMapsUrl({title:'河岸食堂',city:'台北',mapsUrl:generated});assert.equal(new URL(changed).searchParams.get('query'),'河岸食堂 台北');
+ assert.equal(automaticMapsUrl({title:'河岸食堂',mapsUrl:'https://maps.app.goo.gl/exactBranch'}),'https://maps.app.goo.gl/exactBranch');
+ assert.equal(automaticMapsUrl({title:'待確認店名的收藏',city:'台北'}),'');
+ const exact='https://www.google.com/maps/search/?api=1&query=abc&query_place_id=Place123';assert.equal(automaticMapsUrl({title:'河岸食堂',mapsUrl:exact}),exact);
 });

@@ -43,3 +43,9 @@ test('未設定、驗證失敗與 IG 讀不到時不會回報成功',async()=>{
   globalThis.fetch=async()=>{throw Error('Should not fetch non-IG URLs')};const local=await analyzeInput({url:'https://facebook.com/example',content:'店名：小巷咖啡'},settings);assert.equal(local.fields.title,'小巷咖啡');
  }finally{globalThis.fetch=original}
 });
+test('截圖文字可拆多家店，不需網址；IG 讀取失敗仍可用截圖整理',async()=>{
+ const input={url:'',content:'店名：小巷咖啡\n地址：桃園市桃園區民有十街181號\n店名：河岸食堂\n地址：台北市中山區測試路1號'};
+ const local=await analyzeInput(input,{url:'',token:''});assert.equal(local.places.length,2);assert.equal(local.fields.title,'小巷咖啡');
+ const original=globalThis.fetch;
+ try{globalThis.fetch=async()=>Response.json({error:'IG limited'},{status:422});const fallback=await analyzeInput({...input,url:'https://www.instagram.com/reel/DeWRsvKzGFD/'},settings);assert.equal(fallback.places.length,2);assert.match(fallback.message,/暫時無法讀取/)}finally{globalThis.fetch=original}
+});

@@ -30,7 +30,6 @@ async function saveBatch(rawItems:unknown) {
  const incoming=rawItems.map(raw=>{
   if(!raw||typeof raw!=='object'||typeof raw.title!=='string'||!raw.title.trim())throw Error('請為每家選取的店填寫名稱。');
   const data=cleanItem({...raw,title:raw.title.trim(),groupId});
-  if(!data.sources.length)throw Error('多家店收藏需要保留原始來源連結。');
   return {...data,id:crypto.randomUUID(),createdAt:Date.now(),updatedAt:Date.now()};
  });
  const d=await db();const tx=d.transaction('items','readwrite');const done=finished(tx);

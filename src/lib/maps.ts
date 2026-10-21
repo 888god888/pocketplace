@@ -1,9 +1,21 @@
-import {safeMapsUrl} from './organize';
+import {safeMapsUrl,isPlaceholderTitle} from './organize';
 export {safeMapsUrl};
 export type MappablePlace = {title?:string;city?:string;address?:string;mapsUrl?:string};
 
 export function mapsSearchQuery(place:MappablePlace) {
-  return [place.title?.trim(),place.address?.trim()||place.city?.trim()].filter(Boolean).join(' ');
+  const title=isPlaceholderTitle(place.title)?'':place.title?.trim();
+  if(!title&&!place.address?.trim())return '';
+  return [title,place.address?.trim()||place.city?.trim()].filter(Boolean).join(' ');
+}
+
+export function isMapsSearchUrl(raw:unknown) {
+ const value=safeMapsUrl(raw);if(!value)return false;
+ const url=new URL(value);return /^\/maps\/search\/?$/.test(url.pathname)&&!url.searchParams.has('query_place_id');
+}
+
+export function automaticMapsUrl(place:MappablePlace) {
+ const saved=safeMapsUrl(place.mapsUrl);
+ return saved&&!isMapsSearchUrl(saved)?saved:mapsSearchUrl(place)||saved;
 }
 
 export function mapsSearchUrl(place:MappablePlace) {
