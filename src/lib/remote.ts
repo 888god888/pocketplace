@@ -1,7 +1,7 @@
 import {categories, cleanItem, extract, safeUrl} from './organize';
 
 export type Connection = {url: string; token: string};
-export type Place = {title:string; category:string; city:string; address:string; price:string; tags:string[]; notes:string};
+export type Place = {title:string; category:string; city:string; address:string; price:string; tags:string[]; notes:string; mapsUrl?:string};
 export type Candidate = Place & {selected:boolean; reviewed:boolean};
 const key = () => 'pocket-connection:' + new URL('.', document.baseURI).pathname;
 

@@ -13,14 +13,15 @@ test('收藏儲存、防重複、附件備份還原與刪除',async()=>{
  assert.deepEqual(await api('/api/items'),[]);
  const form=new FormData();form.set('file',new File([new Uint8Array([1,2,3,4])],'photo.png',{type:'image/png'}));
  const attachment=await api('/api/files',{method:'POST',body:form});
- const item=await api('/api/items',{method:'POST',body:JSON.stringify({title:'小巷咖啡',category:'咖啡甜點',sources:['https://www.instagram.com/reel/test/?igsh=123'],files:[attachment]})});
+ const mapsUrl='https://maps.app.goo.gl/testCafe';
+ const item=await api('/api/items',{method:'POST',body:JSON.stringify({title:'小巷咖啡',category:'咖啡甜點',mapsUrl,sources:['https://www.instagram.com/reel/test/?igsh=123'],files:[attachment]})});
  assert.equal((await api('/api/items'))[0].title,'小巷咖啡');
  await assert.rejects(api('/api/items',{method:'POST',body:JSON.stringify({title:'重複',sources:['https://www.instagram.com/reel/test/']})}),/已經收藏/);
- const backup=await exportBackup();const parsed=JSON.parse(await backup.text());assert.equal(parsed.assets[0].base64,'AQIDBA==');
+ const backup=await exportBackup();const parsed=JSON.parse(await backup.text());assert.equal(parsed.assets[0].base64,'AQIDBA==');assert.equal(parsed.items[0].mapsUrl,mapsUrl);
  const backupFile=new File([backup],'backup.json',{type:'application/json'});
  assert.equal((await importBackup(backupFile)).skipped,1);
  await api('/api/items?id='+item.id,{method:'DELETE'});assert.deepEqual(await api('/api/items'),[]);
- assert.equal((await importBackup(backupFile)).imported,1);const restored=(await api('/api/items'))[0];assert.equal(restored.title,'小巷咖啡');assert.notEqual(restored.files[0].id,attachment.id);
+ assert.equal((await importBackup(backupFile)).imported,1);const restored=(await api('/api/items'))[0];assert.equal(restored.title,'小巷咖啡');assert.notEqual(restored.files[0].id,attachment.id);assert.equal(restored.mapsUrl,mapsUrl);
  const again=JSON.parse(await (await exportBackup()).text());assert.equal(again.assets[0].base64,'AQIDBA==');
  const bad=new File([JSON.stringify({...parsed,assets:[{...parsed.assets[0],type:'image/svg+xml'}]})],'bad.json');await assert.rejects(importBackup(bad),/格式不正確/);
  assert.equal((await api('/api/items')).length,1);
@@ -31,7 +32,7 @@ test('同則貼文的六家店原子儲存、重複阻擋及完整備份還原',
  const names=['兄弟麵館','ED’s Diner','永昌蕃茄牛肉麵','北安專業涼麵','大直肉圓','大直讚雞肉飯'];
  const form=new FormData();form.set('file',new File([new Uint8Array([5,6])],'shared.png',{type:'image/png'}));
  const file=await api('/api/files',{method:'POST',body:form});
- const payload=names.map(title=>({title,sources:[url],category:'美食',files:[file],content:'同則貼文六家店'}));
+ const payload=names.map((title,i)=>({title,sources:[url],category:'美食',files:[file],content:'同則貼文六家店',mapsUrl:i===1?'https://maps.app.goo.gl/testDiner':''}));
  const saved=await api('/api/items/batch',{method:'POST',body:JSON.stringify({items:payload})});
  assert.equal(saved.length,6);assert.equal(new Set(saved.map(x=>x.groupId)).size,1);
  const before=(await api('/api/items')).length;
@@ -46,6 +47,8 @@ test('同則貼文的六家店原子儲存、重複阻擋及完整備份還原',
  const group=(await api('/api/items')).filter(x=>x.sources.includes(url));
  assert.deepEqual(group.map(x=>x.title).sort(),names.slice().sort());
  assert.ok(group.every(x=>x.files.length===1));
+ assert.equal(group.find(x=>x.title==='ED’s Diner').mapsUrl,'https://maps.app.goo.gl/testDiner');
+ assert.ok(group.filter(x=>x.title!=='ED’s Diner').every(x=>!x.mapsUrl));
  const again=await importBackup(new File([backup],'batch-backup.json',{type:'application/json'}));assert.equal(again.imported,0);
  await api('/api/items?id='+group[0].id,{method:'DELETE'});
  const after=JSON.parse(await (await exportBackup()).text());assert.equal(after.assets.filter(x=>x.name==='shared.png').length,1);
